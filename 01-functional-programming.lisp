@@ -18,21 +18,20 @@
 
 ;; functional code flows
 
-(defun stack ()
-  (let ((m-stack ()))
-    (values
-     (lambda (x) (push x m-stack)) ; push
-     (lambda () (pop m-stack)) ; pop
-     (lambda () (null m-stack))))) ; empty
-
 (defmacro with-gensyms ((&rest gensyms) &body body)
   `(let ,(loop for gs in gensyms collect `(,gs (gensym)))
        ,@body))
 
-(defmacro new-stack (name)
-  `(with-gensyms (a b c)
-     (multiple-value-bind (a b c) (stack)
-       (setf (symbol-function (intern (format nil "~a~a" ,name '-push))) a
-             (symbol-function (intern (format nil "~a~a" ,name '-pop))) b
-             (symbol-function (intern (format nil "~a~a" ,name '-is-empty))) c))))
+(defmacro stack (name)
+  `(flet ((new-stack ()
+            (let ((m-stack ()))
+              (values
+               (lambda (x) (push x m-stack)) ; push
+               (lambda () (pop m-stack)) ; pop
+               (lambda () (null m-stack)))))) ; empty
+     (with-gensyms (a b c)
+       (multiple-value-bind (a b c) (new-stack)
+         (setf (symbol-function (intern (format nil "~a~a" ,name '-push))) a
+               (symbol-function (intern (format nil "~a~a" ,name '-pop))) b
+               (symbol-function (intern (format nil "~a~a" ,name '-is-empty))) c)))))
 

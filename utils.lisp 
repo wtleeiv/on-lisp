@@ -1,0 +1,31 @@
+;; (proclaim '(inline last1 singlep append1 conc1 mklist))
+;;; inline utils //forspeed
+
+(defmacro with-gensyms ((&rest gensyms) &body body)
+  "let for gensym bindings"
+  `(let ,(loop for gs in gensyms collect `(,gs (gensym)))
+       ,@body))
+
+(defun find2 (fn lst)
+  "return first list element which returns something from fn and it's value"
+  (if (null lst)
+      nil
+      (let ((val (funcall fn (car lst))))
+        (if val
+            (values (car lst) val)
+            (find2 fn (cdr lst))))))
+
+(defun last1 (lst)
+  (car (last lst)))
+
+(defun singlep (lst)
+  (and (consp lst) (not (cdr lst))))
+
+(defun append1 (lst atom)
+  (append lst (list atom)))
+
+(defun conc1 (lst obj)
+  (nconc lst (list obj)))
+
+(defun mklist (obj)
+  (if (listp obj) obj (list obj)))
