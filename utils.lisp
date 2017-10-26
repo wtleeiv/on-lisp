@@ -5,6 +5,7 @@
   `(let ,(loop for gs in gensyms collect `(,gs (gensym)))
        ,@body))
 
+;; TODO: make more haskell-esque
 (defun seq (x n)
   (labels ((iter (n acc)
              (if (= n 0)
@@ -15,6 +16,7 @@
 ;;;; pg
 
 ;;; small
+
 (proclaim '(inline last1 singlep append1 conc1 mklist))
 ;;; inline these //forspeed
 
@@ -32,8 +34,8 @@
 
 (defun mklist (obj)
   (if (listp obj) obj (list obj)))
- 
-;;; bigger 
+
+;;; bigger
 
 (defun longer (x y)
   (labels ((compare (x y)
@@ -85,7 +87,6 @@
 
 ;;; search
 
-
 (defun find2 (fn lst)
   "return first list element which returns something from fn and it's value"
   (if (null lst)
@@ -94,3 +95,26 @@
         (if val
             (values (car lst) val)
             (find2 fn (cdr lst))))))
+
+(defun before (x y lst &key (test #'eql))
+  (and lst ; not nil
+       (let ((first (car lst)))
+         (cond ((funcall test y first) nil)
+               ((funcall test x first) lst)
+               (t (before x y (cdr lst) :test test))))))
+
+(defun after (x y lst &key (test #'eql))
+  (let ((rest (before y x lst :test test)))
+    (and rest (member x lst :test test))))
+
+(defun duplicate (obj lst &key (test #'eql))
+  (member obj (cdr (member obj lst :test test)) :test test))
+
+(defun split-if (fn lst)
+  (let ((acc nil))
+    (do ((seq lst (cdr seq)))
+        ((or (null seq) (funcall fn (car seq)))
+         (values (nreverse acc) seq))
+      (push (car seq) acc))))
+
+;;; comparative search

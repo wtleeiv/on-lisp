@@ -143,3 +143,37 @@
                                 (cons (car tree) acc)))))))
     (rec lst nil)))
 
+;;; searching
+
+(defun find2 (fn lst)
+  (if (null lst)
+      nil
+      (let ((val (funcall fn (car lst))))
+        (if val
+            (values (car lst) val)
+            (find2 fn (cdr lst))))))
+
+(defun before (x y lst &key (test #'eql))
+  (and lst ; not nil
+       (let ((first (car lst)))
+         (cond ((funcall test y first) nil)
+               ((funcall test x first) lst)
+               (t (before x y (cdr lst) :test test))))))
+
+(defun after (x y lst &key (test #'eql))
+  (let ((rest (before y x lst :test test)))
+    (and rest (member x lst :test test))))
+
+(defun duplicate (obj lst &key (test #'eql))
+  (member obj (cdr (member obj lst :test test)) :test test))
+
+(defun split-if (fn lst)
+  (let ((acc nil))
+    (do ((seq lst (cdr seq)))
+        ((or (null seq) (funcall fn (car seq)))
+         (values (nreverse acc) seq))
+      (push (car seq) acc))))
+
+;;; comparative search
+
+
