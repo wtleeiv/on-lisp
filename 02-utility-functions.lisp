@@ -1,3 +1,19 @@
+(defun powers-of (n lst)
+  (flet ((next-greater (num current-power power-list)
+           (do* ((pow (1+ current-power) (1+ pow))
+                 (mult (expt n pow) (expt n pow)))
+                ((>= mult num) (values (= mult num) pow (cons mult power-list)))
+             (push mult power-list))))
+    (let ((powers (list n))
+          (power 1)
+          (result nil))
+      (dolist (i lst (nreverse result))
+        (cond ((> i (car powers))
+               (multiple-value-bind (is-power new-power power-list) (next-greater i power powers)
+                 (setf power new-power powers power-list)
+                 (if is-power (push i result))))
+              ((member i powers) (push i result)))))))
+
 ;; aside:
 ;;; (consp nil) => nil
 ;;; (listp nil) => 't
@@ -20,7 +36,7 @@
             (values (car towns) shops)
             (nearest-bookstores (cdr towns))))))
 ;; util
-(defun find2 (fn lst)
+(defun find2 max(fn lst)
   "return first list element which returns something from fn and it's value"
   (if (null lst)
       nil
@@ -175,5 +191,110 @@
       (push (car seq) acc))))
 
 ;;; comparative search
+
+(defun most (fn lst)
+  (if (null lst)
+      (values nil nil)
+      (let* ((winner (car lst))
+             (max (funcall fn winner)))
+        (dolist (obj (cdr lst) (values winner max))
+          (let ((val (funcall fn obj)))
+            (when (> val max)
+              (setf winner obj max val)))))))
+
+(defun best (fn lst)
+  "takes comparison fn and list, returns element w/ best comparison"
+  (if (null lst)
+      nil
+      (let ((wins (car lst)))
+        (dolist (obj (cdr lst) wins)
+          (if (funcall fn obj wins)
+              (setf wins obj))))))
+
+(defun mostn (fn lst)
+  (if (null lst)
+      (values nil nil)
+      (let* ((result (list (car lst)))
+            (max (funcall fn (car result))))
+        (dolist (obj (cdr lst) (values (nreverse result) max))
+          (let ((val (funcall fn obj)))
+            (cond ((> val max)
+                   (setf result (list obj) max val))
+                  ((eql val max)
+                   (push obj result))))))))
+
+;;; mapping
+
+(defun map-> (fn start end-fn step-fn)
+  (do ((i start (funcall step-fn i))
+       (result nil))
+      ((funcall end-fn i) (nreverse result))
+    (push (funcall fn i) result)))
+
+(defun mapa-b (fn a b &optional (step 1))
+  (map-> fn a (lambda (n) (> n b)) (lambda (n) (+ n step))))
+
+(defun map0-n (fn n)
+  (mapa-b fn 0 n))
+
+(defun map1-n (fn n)
+  (mapa-b fn 1 n))
+
+(defun mappend (fn &rest lsts)
+  "non-destructive mapcan"
+  (apply #'append (apply #'mapcar fn lsts)))
+
+(defun mapcars (fn &rest lsts)
+  (let ((result nil))
+    (dolist (lst lsts (nreverse result))
+      (dolist (obj lst)
+        (push (funcall fn obj) result)))))
+
+;; if args are atoms, apply to fn
+;; else, mapcar over args w/ recursion
+(defun rmapcar (fn &rest args)
+  (if (some #'atom args)
+      (apply fn args)
+      (apply #'mapcar
+             (lambda (&rest args)
+               (apply #'rmapcar fn args))
+             args)))
+
+;;; IO
+
+(defun readlist (&rest args)
+  "make list from string"
+  (values (read-from-string (concatenate 'string "(" (apply #'read-line args) ")"))))
+
+(defun prompt (&rest args)
+  (apply #'format *query-io* args)
+  (read *query-io*))
+
+(defun break-loop (fn quit &rest args)
+  (format *query-io* "Entering break-loop.~%")
+  (loop
+    (let ((in (apply #'prompt args)))
+      (if (funcall quit in)
+          (return)
+          (format *query-io* "~A~%" (funcall fn in))))))
+
+;;; symbols & strings
+
+(defun mkstr (&rest args)
+  (with-output-to-string (s)
+    (dolist (a args) (princ a s))))
+
+(defun symb (&rest args)
+  (values (intern (apply #'mkstr args))))
+
+(defun reread (&rest args)
+  (values (read-from-string (apply #'mkstr args))))
+
+(defun explode (sym)
+  (map 'list (lambda (c)
+               (intern (make-string 1 :initial-element c)))
+       (symbol-name sym)))
+
+
 
 
