@@ -67,6 +67,8 @@
 
 ;;; recursion on cdrs
 
+;; not tail-recursive
+;;; good for prototyping, but not optimized in many cases
 (defun lrec (rec &optional base)
   "rec: fn of two args (car and recursor)"
   (labels ((self (lst)
@@ -78,4 +80,51 @@
                           (lambda () (self (cdr lst)))))))
     #'self))
 
-;; (setf my-length (lrec (lambda (x f) (1+ (funcall f))) 0))
+;; length: (lrec (lambda (x f) (1+ (funcall f))) 0)
+;; copy-list: (lrec (lambda (x f) (cons x (funcall f))))
+;; remove-duplicates: (lrec (lambda (x f) (adjoin x (funcall f))))
+;; find-if, for function fn: (lrec (lambda (x f) (if (fn x) x (funcall f))))
+;; some, for function fn: (lrec (lambda (x f) (or (fn x) (funcall f))))
+;; every, for function fn: (lrec (lambda (x f) (and (fn x) (funcall f))) t)
+
+(defun my-copy-tree (tree)
+  (if (atom tree)
+      tree
+      (cons (my-copy-tree (car tree))
+            (if (cdr tree) (my-copy-tree (cdr tree))))))
+
+;;; tree recursion
+
+(defun ttrav (rec &optional (base #'identity))
+  (labels ((self (tree)
+             (if (atom tree)
+                 (if (functionp base)
+                     (funcall base tree)
+                     base)
+                 (funcall rec
+                          (self (car tree))
+                          (if (cdr tree) (self (cdr tree)))))))
+    #'self))
+
+;; coppy-tree (ttrav #'cons)
+;; count-leaves (ttrav (lambda (l r) (+ l (or r 1))) 1)
+;; flatten (ttrav #'nconc #'mklist)
+
+
+(defun trec (rec &optional (base #'identity))
+  "rec takes 3 args: obj, car (left) rec, & cdr (right) rec"
+  (labels ((self (tree)
+             (if (atom tree)
+                 (if (functionp base)
+                     (funcall base tree)
+                     base)
+                 (funcall rec tree
+                          (lambda () (self (car tree)))
+                          (lambda () (if (cdr tree)
+                                         (self (cdr tree))))))))
+    #'self))
+
+;; rfind-if (trec (lambda (o l r) (or (funcall l) (funcall r))) (lambda (obj) (fn obj)))
+
+;; #. read macro ~ construct function at readtime (if args are defined)
+;;; (find-if #.(compose #'oddp #'truncate) lst)
