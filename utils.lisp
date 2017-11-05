@@ -313,3 +313,24 @@
                           (lambda () (if (cdr tree)
                                          (self (cdr tree))))))))
     #'self))
+
+
+;;; macros
+
+(defmacro memq (obj lst)
+  `(member ,obj ,lst :test #'eq))
+
+(defmacro while (test &body body)
+  `(do ()
+       ((not ,test))
+     ,@body))
+
+(defmacro mac (expr)
+  "pretty-print macroexpansion"
+  `(pprint (macroexpand-1 ',expr)))
+
+(defmacro when-bind ((var expr) &body body)
+  "evaluate 'when' after binding test variable"
+  `(let ((,var ,expr))
+     (when ,var
+       ,@body)))
