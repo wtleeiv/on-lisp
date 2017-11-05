@@ -134,21 +134,84 @@
           (psetq ,@(make-stepforms bindforms))
           (go ,label)))))
 
+;; macro code
+;;; expander code
+;;;; used to generate expansion code
+;;;; clarity / efficiency
+;;; expansion code
+;;;; the code that will be run
+;;;; efficiency / clarity
 
+;; code you wouldn't usually write (goto, setq, etc)
+;; is more ok in macros (ex. see above)
+;;; write macros to hide unsafe code
+;;; use it programatically, not raw
 
+;; be mindful of macro redifinition
+;;; code that sues macros don't automatically get new def
+;;; because macro is expanded, and reference to it is lost
 
+;; macro rules
+;;; define macros before they are called
+;;; when redefining macros, redefine all callers
 
+;;;; symbol macros
+;;; like macros that take no args
+;;; sometimes useful
+;; (symbol-macrolet ((hi (progn (print "Howdy!")
+;;                              1)))
+;;   (+ hi 2))
+;; ->
+;; "Howdy!"
+;; 3
 
-(defun make-initforms (bindforms)
-  (mapcar (lambda (b)
-            (if (consp b)
-                (list (car b) (cadr b))
-                (list (car b) nil)))
-          bindforms))
-(defun make-stepforms (bindforms)
-  (mapcan (lambda (b)
-            (if (and (consp b) (third b))
-                (list (car b) (third b))
-                nil))
-          bindforms))
+;; macros control evaluation of their arguments
 
+;; macro vs function
+(defun avg (&rest args)
+  (/ (apply #'+ args) (length args)))
+;; compute length at compile time
+(defmacro avg (&rest args)
+  `(/ ,(+ ,@args) ,(length args)))
+
+;; macros emcapsulate patterns
+;;; allow program to declare in a clearer voice what it's doing
+
+;; example: graphics language
+;;; pre-macro
+(defun move-objs (objs dx dy)
+  (multiple-value-bind (x0 y0 x1 y1) (bounds objs)
+    (dolist (o objs)
+      (incf (obj-x o) dx)
+      (incf (obj-y o) dy))
+    (multiple-value-bind (xa ya xb yb) (bounds objs)
+      (redraw (min x0 xa) (min y0 ya)
+              (max x1 xb) (max y1 yb)))))
+(defun scale-objs (objs factor)
+  (multiple-value-bind (x0 y0 x1 y1) (bounds objs)
+    (dolist (o objs)
+      (setf (obj-dx o) (* (obj-dx o) factor))
+      (setf (obj-dy o) (* (obj-dy o) factor)))
+    (multiple-value-bind (xa ya xb yb) (bounds objs)
+      (redraw (min x0 xa) (min y0 ya)
+              (max x1 xb) (max y1 yb)))))
+;;; post-macro
+(defmacro with-redraw ((var objs) &body body)
+  (let ((gob (gensym))
+        (x0 (gensym)) (y0 (gensym))
+        (x1 (gensym)) (y1 (gensym)))
+    `(let ((,gob ,objs))
+       (multiple-value-bind (,x0 ,y0 ,x1 ,y1) (bounds ,gob)
+         (dolist (,var ,gob)
+           ,@body)
+         (multiple-value-bind (xa ya xb yb) (bounds ,gob)
+           (redraw (min ,x0 xa) (min ,y0 ya)
+                   (max ,x1 xb) (max ,y1 yb)))))))
+(defun move-objs (objs dx dy)
+  (with-redraw (o objs)
+    (incf (obj-x o) dx)
+    (incf (obj-y o) dy)))
+(defun scale-objs (objs factor)
+  (with-redraw (o objs)
+    (setf (obj-dx o) (* (obj-dx o) factor))
+    (setf (obj-dy o (* (obj-dy o) factor)))))
