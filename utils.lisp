@@ -1,20 +1,3 @@
-;;;; me
-
-(defmacro with-gensyms ((&rest gensyms) &body body)
-  "let for gensym bindings"
-  `(let ,(loop for gs in gensyms collect `(,gs (gensym)))
-       ,@body))
-
-;; TODO: make more haskell-esque
-(defun seq (x n)
-  (labels ((iter (n acc)
-             (if (= n 0)
-                 acc
-                 (iter (1- n) (cons x acc)))))
-    (iter n nil)))
-
-;;;; pg
-
 ;;; small
 
 (proclaim '(inline last1 singlep append1 conc1 mklist))
@@ -329,15 +312,28 @@
   "pretty-print macroexpansion"
   `(pprint (macroexpand-1 ',expr)))
 
-(defmacro when-bind ((var expr) &body body)
-  "evaluate 'when' after binding test variable"
-  `(let ((,var ,expr))
-     (when ,var
-       ,@body)))
-
 (defmacro for ((var start stop) &body body)
   (let ((gstop (gensym)))
     `(do ((,var ,start (1+ ,var))
           (,gstop ,stop)) ; prevent multiple evaluation of stop
          ((> ,var ,gstop)) ; here
        ,@body)))
+
+(defmacro when-bind ((var expr) &body body)
+  "bind expr to val, if val is non-nil, eval body"
+  `(let ((,var ,expr))
+     (when ,var
+       ,@body)))
+
+(defmacro when-bind* (binds &body body)
+  "bind all exprs, eval body if all binds are non-nil"
+  (if (null binds)
+      `(progn ,@body)
+      `(let (,(car binds))
+         (if ,(caar binds)
+             (when-bind* ,(cdr binds) ,@body)))))
+
+(defmacro with-gensyms (syms &body body)
+  `(let ,(mapcar (lambda (sym) `(,sym (gensym)))
+          syms)
+     ,@body))

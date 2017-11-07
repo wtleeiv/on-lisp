@@ -27,7 +27,7 @@
 ;;;; number of evaluations
 ;; macro arguments are forms, not values
 ;;; and can be evaluated more than once
-;;;; usuall this is bad
+;;;; usually this is bad
 ;; solution: bind form evaluation to variable (gensym)
 ;;; use that where you would use argument
 
