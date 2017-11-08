@@ -30,8 +30,6 @@
           syms)
      ,@body))
 
-
-
 (defmacro condlet (clauses &body body)
   "bind vars conditionally, then eval body with bindings"
   (let ((bodfn (gensym))
@@ -57,3 +55,11 @@
           (cdr cl)))
 
 
+;; the 'with-' macro
+;;; deal w/ state
+
+;; unwind-protect
+;;; eval all subsequent forms regardless if 1st form throws error
+
+;; conditional evaluation
+;; pg 150
