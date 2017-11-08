@@ -29,3 +29,31 @@
   `(let ,(mapcar (lambda (sym) `(,sym (gensym)))
           syms)
      ,@body))
+
+
+
+(defmacro condlet (clauses &body body)
+  "bind vars conditionally, then eval body with bindings"
+  (let ((bodfn (gensym))
+        (vars (mapcar (lambda (v) (cons v (gensym))) ; bind gensyms to non-duplicate vars
+                      (remove-duplicates
+                       (mapcar #'car ; get var names
+                               (mappend #'cdr clauses)))))) ; get all var bindings
+    `(labels ((,bodfn ,(mapcar #'car vars)
+                ,@body))
+       (cond ,@(mapcar (lambda (cl) (condlet-clause vars cl bodfn))
+                       clauses)))))
+
+(defun condlet-clause (vars cl bodfn)
+  `(,(car cl) (let ,(mapcar #'cdr vars)
+                (let ,(condlet-binds vars cl)
+                  (,bodfn ,@(mapcar #'cdr vars))))))
+
+(defun condlet-binds (vars cl)
+  (mapcar (lambda (bindform)
+            (if (consp bindform)
+                (cons (cdr (assoc (car bindform) vars))
+                      (cdr bindform))))
+          (cdr cl)))
+
+
