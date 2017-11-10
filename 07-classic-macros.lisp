@@ -61,5 +61,40 @@
 ;; unwind-protect
 ;;; eval all subsequent forms regardless if 1st form throws error
 
+;; as macros grow in complexity, its simpler to combine with fns
+;;; splice body into lambda, pass to fn
+;; but that's lame :)
+
 ;; conditional evaluation
 ;; pg 150
+
+(defmacro nif (expr pos zero neg)
+  (let ((val (gensym))) ; declare gensyms outside of backquote
+    `(let ((,val ,expr)) ; get new gensym at compile-time -> replace gensym val in expanded code
+       (cond ((plusp ,val) ,pos)
+             ((zerop ,val) ,zero)
+             (t ,neg)))))
+
+(defmacro in (obj &rest choices)
+  "short-circuit test if obj is in choices"
+  (let ((insym (gensym)))
+    `(let ((,insym ,obj))
+       (or ,@(mapcar (lambda (c) `(eql ,insym ,c))
+                     choices)))))
+
+(defmacro inq (obj &rest choices)
+  "quote choices, eval obj"
+  `(in ,obj ,@(mapcar (lambda (c) `',c) choices)))
+
+(defmacro in-if (fn &rest choices)
+  "short-circuit test-fn applied to choices"
+  (let ((fnsym (gensym)))
+    `(let ((,fnsym ,fn))
+       (or ,@(mapcar (lambda (c) `(funcall ,fnsym ,c))
+                     ,choices)))))
+
+;; case is like a switch statement (static choices)
+;; >case evals cases
+;; (cond ((in cases1) (do stuff)) ((in cases2) (do other-stuff)))
+(defmacro >case (expr &rest clauses)
+  )
