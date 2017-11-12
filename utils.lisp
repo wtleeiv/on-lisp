@@ -303,21 +303,9 @@
 (defmacro memq (obj lst)
   `(member ,obj ,lst :test #'eq))
 
-(defmacro while (test &body body)
-  `(do ()
-       ((not ,test))
-     ,@body))
-
 (defmacro mac (expr)
   "pretty-print macroexpansion"
   `(pprint (macroexpand-1 ',expr)))
-
-(defmacro for ((var start stop) &body body)
-  (let ((gstop (gensym)))
-    `(do ((,var ,start (1+ ,var))
-          (,gstop ,stop)) ; prevent multiple evaluation of stop
-         ((> ,var ,gstop)) ; here
-       ,@body)))
 
 (defmacro when-bind ((var expr) &body body)
   "bind expr to val, if val is non-nil, eval body"
@@ -362,3 +350,68 @@
                 (cons (cdr (assoc (car bindform) vars))
                       (cdr bindform))))
           (cdr cl)))
+
+
+;;; conditional evaluation
+
+(defmacro nif (expr pos zero neg)
+  (let ((val (gensym))) ; declare gensyms outside of backquote
+    `(let ((,val ,expr)) ; get new gensym at compile-time -> replace gensym val in expanded code
+       (cond ((plusp ,val) ,pos)
+             ((zerop ,val) ,zero)
+             (t ,neg)))))
+
+(defmacro in (obj &rest choices)
+  "short-circuit test if obj is in choices"
+  (let ((insym (gensym)))
+    `(let ((,insym ,obj))
+       (or ,@(mapcar (lambda (c) `(eql ,insym ,c))
+                     choices)))))
+
+(defmacro inq (obj &rest choices)
+  "quote choices, eval obj"
+  `(in ,obj ,@(mapcar (lambda (c) `',c) choices)))
+
+(defmacro in-if (fn &rest choices)
+  "short-circuit test-fn applied to choices"
+  (let ((fnsym (gensym)))
+    `(let ((,fnsym ,fn))
+       (or ,@(mapcar (lambda (c) `(funcall ,fnsym ,c))
+                     ,choices)))))
+
+;; case is like a switch statement (static choices)
+;; >case evals cases
+;; (cond ((in cases1) (do stuff)) ((in cases2) (do other-stuff)))
+(defmacro >case (expr &rest clauses)
+  (let ((g (gensym)))
+    `(let ((,g ,expr))
+       (cond ,@(mapcar (lambda (cl) (>casex g cl))
+                       clauses)))))
+;; helper fn for >case
+(defun >casex (g cl)
+  (let ((key (car cl)) (rest (cdr cl)))
+    (cond ((consp key) `((in ,g ,@key) ,@rest))
+          ((inq key t otherwise) `(t ,@rest))
+          (t (error "bad >case clause")))))
+
+
+;;; iteration
+;; simple
+
+
+(defmacro while (test &body body)
+  `(do ()
+       ((not ,test))
+     ,@body))
+
+(defmacro till (test &body body)
+  `(do ()
+       (,test)
+     ,@body))
+
+(defmacro for ((var start stop) &body body)
+  (let ((gstop (gensym)))
+    `(do ((,var ,start (1+ ,var))
+          (,gstop ,stop)) ; prevent multiple evaluation of stop
+         ((> ,var ,gstop)) ; here
+       ,@body)))

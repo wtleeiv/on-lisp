@@ -66,7 +66,6 @@
 ;; but that's lame :)
 
 ;; conditional evaluation
-;; pg 150
 
 (defmacro nif (expr pos zero neg)
   (let ((val (gensym))) ; declare gensyms outside of backquote
@@ -97,4 +96,49 @@
 ;; >case evals cases
 ;; (cond ((in cases1) (do stuff)) ((in cases2) (do other-stuff)))
 (defmacro >case (expr &rest clauses)
-  )
+  (let ((g (gensym)))
+    `(let ((,g ,expr))
+       (cond ,@(mapcar (lambda (cl) (>casex g cl))
+                       clauses)))))
+
+(defun >casex (g cl)
+  (let ((key (car cl)) (rest (cdr cl)))
+    (cond ((consp key) `((in ,g ,@key) ,@rest))
+          ((inq key t otherwise) `(t ,@rest))
+          (t (error "bad >case clause")))))
+
+
+;;; iteration
+;; eval forms more than once
+
+(defmacro while (test &body body)
+  `(do ()
+       ((not ,test))
+     ,@body))
+
+(defmacro till (test &body body)
+  `(do ()
+       (,test)
+     ,@body))
+
+(defmacro for ((var start stop) &body body)
+  (let ((gstop (gensym)))
+    `(do ((,var ,start (1+ ,var))
+          (,gstop ,stop)) ; prevent multiple evaluation of stop
+         ((> ,var ,gstop)) ; here
+       ,@body)))
+
+;;; more complex iteration
+
+;; mapcar takes #lists eq to #args
+;;; and recurses down all til reach end of one
+;; call mapc (don't save returns) on n cdr lists of source
+(defmacro do-tuples/o (parms source &body body)
+  (if parms ; don't do if no params passed in
+      (let ((src (gensym)))
+        `(prog ((,src ,source))
+            (mapc (lambda ,parms ,@body)
+                  ,@(map0-n (lambda (n)
+                              `(nthcdr ,n ,src))
+                            (1- (length parms))))))))
+
