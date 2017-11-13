@@ -326,7 +326,20 @@
           syms)
      ,@body))
 
-;; might not work in all cases...
+;; used in condlet (below)
+
+(defun condlet-binds (vars cl)
+  (mapcar (lambda (bindform)
+            (if (consp bindform)
+                (cons (cdr (assoc (car bindform) vars))
+                      (cdr bindform))))
+          (cdr cl)))
+
+(defun condlet-clause (vars cl bodfn)
+  `(,(car cl) (let ,(mapcar #'cdr vars)
+                (let ,(condlet-binds vars cl)
+                  (,bodfn ,@(mapcar #'cdr vars))))))
+
 (defmacro condlet (clauses &body body)
   "bind vars conditionally, then eval body with bindings"
   (let ((bodfn (gensym))
@@ -338,18 +351,6 @@
                 ,@body))
        (cond ,@(mapcar (lambda (cl) (condlet-clause vars cl bodfn))
                        clauses)))))
-
-(defun condlet-clause (vars cl bodfn)
-  `(,(car cl) (let ,(mapcar #'cdr vars)
-                (let ,(condlet-binds vars cl)
-                  (,bodfn ,@(mapcar #'cdr vars))))))
-
-(defun condlet-binds (vars cl)
-  (mapcar (lambda (bindform)
-            (if (consp bindform)
-                (cons (cdr (assoc (car bindform) vars))
-                      (cdr bindform))))
-          (cdr cl)))
 
 
 ;;; conditional evaluation
@@ -379,6 +380,13 @@
        (or ,@(mapcar (lambda (c) `(funcall ,fnsym ,c))
                      choices)))))
 
+;; helper fn for >case
+(defun >casex (g cl)
+  (let ((key (car cl)) (rest (cdr cl)))
+    (cond ((consp key) `((in ,g ,@key) ,@rest))
+          ((inq key t otherwise) `(t ,@rest))
+          (t (error "bad >case clause")))))
+
 ;; case is like a switch statement (static choices)
 ;; >case evals cases
 ;; (cond ((in cases1) (do stuff)) ((in cases2) (do other-stuff)))
@@ -387,12 +395,6 @@
     `(let ((,g ,expr))
        (cond ,@(mapcar (lambda (cl) (>casex g cl))
                        clauses)))))
-;; helper fn for >case
-(defun >casex (g cl)
-  (let ((key (car cl)) (rest (cdr cl)))
-    (cond ((consp key) `((in ,g ,@key) ,@rest))
-          ((inq key t otherwise) `(t ,@rest))
-          (t (error "bad >case clause")))))
 
 
 ;;; iteration
@@ -427,6 +429,17 @@
                               `(nthcdr ,n ,src))
                             (1- (length parms))))))))
 
+;; used in do-tuples/c
+(defun dt-args (len rest src)
+  (map0-n (lambda (m)
+            (map1-n (lambda (n)
+                      (let ((x (+ m n)))
+                        (if (>= x len)
+                            `(nth ,(- x len) ,src)
+                            `(nth ,(1- x) ,rest))))
+                    len))
+          (- len 2)))
+
 ;; wraps source to cover all elements
 ;; uses a bunch of nths to get args
 ;;; complex math, lots of off-by-ones possible
@@ -448,12 +461,3 @@
                                        `(nth ,(1- n) ,rest))
                                      len))))))))))
 
-(defun dt-args (len rest src)
-  (map0-n (lambda (m)
-            (map1-n (lambda (n)
-                      (let ((x (+ m n)))
-                        (if (>= x len)
-                            `(nth ,(- x len) ,src)
-                            `(nth ,(1- x) ,rest))))
-                    len))
-          (- len 2)))

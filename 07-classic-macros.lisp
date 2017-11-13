@@ -172,3 +172,7 @@
                             `(nth ,(1- x) ,rest))))
                     len))
           (- len 2)))
+
+
+;;; multiple value iteration
+;; pg 168
