@@ -377,7 +377,7 @@
   (let ((fnsym (gensym)))
     `(let ((,fnsym ,fn))
        (or ,@(mapcar (lambda (c) `(funcall ,fnsym ,c))
-                     ,choices)))))
+                     choices)))))
 
 ;; case is like a switch statement (static choices)
 ;; >case evals cases
@@ -398,7 +398,6 @@
 ;;; iteration
 ;; simple
 
-
 (defmacro while (test &body body)
   `(do ()
        ((not ,test))
@@ -415,3 +414,46 @@
           (,gstop ,stop)) ; prevent multiple evaluation of stop
          ((> ,var ,gstop)) ; here
        ,@body)))
+
+;; mapcar takes #lists eq to #args
+;;; and recurses down all til reach end of one
+;; call mapc (don't save returns) on n cdr lists of source
+(defmacro do-tuples/o (parms source &body body)
+  (if parms ; don't do if no params passed in
+      (let ((src (gensym)))
+        `(prog ((,src ,source))
+            (mapc (lambda ,parms ,@body)
+                  ,@(map0-n (lambda (n)
+                              `(nthcdr ,n ,src))
+                            (1- (length parms))))))))
+
+;; wraps source to cover all elements
+;; uses a bunch of nths to get args
+;;; complex math, lots of off-by-ones possible
+(defmacro do-tuples/c (parms source &body body)
+  (if parms
+      (with-gensyms (src rest bodfn)
+        (let ((len (length parms)))
+          `(let ((,src ,source))
+             (when (nthcdr ,(1- len) ,src) ; source len >= parms len
+               (labels ((,bodfn ,parms ,@body)) ; defun here
+                 (do ((,rest ,src (cdr ,rest)))
+                     ((not (nthcdr ,(1- len) ,rest)) ; when wrap req'd
+                      ;; *at* or past end
+                      ,@(mapcar (lambda (args) `(,bodfn ,@args))
+                                (dt-args len rest src))
+                      nil) ; do above, then return nil
+                   ;; (map1-n (1- n) len) same as (map0-n n (- len 1))
+                   (,bodfn ,@(map1-n (lambda (n)
+                                       `(nth ,(1- n) ,rest))
+                                     len))))))))))
+
+(defun dt-args (len rest src)
+  (map0-n (lambda (m)
+            (map1-n (lambda (n)
+                      (let ((x (+ m n)))
+                        (if (>= x len)
+                            `(nth ,(- x len) ,src)
+                            `(nth ,(1- x) ,rest))))
+                    len))
+          (- len 2)))
