@@ -497,3 +497,72 @@
 
 (defmacro mvdo* (parm-cl test-cl &body body)
   (mvdo-gen parm-cl parm-cl test-cl body))
+
+(defun shuffle (x y)
+  (cond ((null y) x)
+        ((null x) y)
+        (t (list* (car x) (car y)
+                  (shuffle (cdr x) (cdr y))))))
+
+(defmacro mvpsetq (&rest args)
+  (let* ((pairs (group args 2))
+         (syms (mapcar (lambda (p)
+                         (mapcar (lambda (x)
+                                   ;; unused lexical variable
+                                   ;; don't care what x is, just make a gensym for it
+                                   (declare (ignore x))
+                                   (gensym))
+                                 (mklist (car p))))
+                       pairs)))
+    (labels ((rec (ps ss)
+               (if (null ps)
+                   ;; setq all vars to gensym vals
+                   `(setq ,@(mapcan
+                             (lambda (p s)
+                               (shuffle (mklist (car p))
+                                        s))
+                             pairs syms))
+                   ;; bind pairs, nest recurse form
+                   (let ((body (rec (cdr ps) (cdr ss))))
+                     (let ((var/s (caar ps))
+                           (expr (cadar ps)))
+                       ;; single -> let, multiple -> mvb
+                       (if (consp var/s)
+                           `(multiple-value-bind ,(car ss) ,expr
+                              ,body)
+                           `(let ((,@(car ss) ,expr))
+                              ,body)))))))
+      (rec pairs syms))))
+
+(defmacro mvdo (binds (test &rest result) &body body)
+  (let ((label (gensym))
+        ;; used in initial prog bindings
+        (temps (mapcar (lambda (b)
+                         (if (listp (car b))
+                             (mapcar (lambda (x)
+                                       (declare (ignore x))
+                                       (gensym))
+                                     (car b))
+                             (gensym)))
+                       binds)))
+    `(let ,(mappend #'mklist temps) ; declare temp vars
+       ;; inital binding of temp vars
+       (mvpsetq ,@(mapcan (lambda (b var)
+                            (list var (cadr b)))
+                          binds
+                          temps))
+       ;; bind vars to temps
+       (prog ,(mapcar (lambda (b var) (list b var))
+               (mappend #'mklist (mapcar #'car binds))
+               (mappend #'mklist temps))
+          ,label
+          (if ,test
+              (return (progn ,@result)))
+          ,@body
+          ;; rebind vars to step-forms
+          (mvpsetq ,@(mapcan (lambda (b)
+                               (if (third b)
+                                   (list (car b)
+                                         (third b))))
+                             binds))
+          (go ,label)))))
