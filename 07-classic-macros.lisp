@@ -175,4 +175,49 @@
 
 
 ;;; multiple value iteration
-;; pg 168
+
+;; rebinds initially contains all bindforms
+;; recurse and cons together rebinding form
+(defun mvdo-rebind-gen (rebinds)
+  (cond ((null rebinds) nil)
+        ((< (length (car rebinds)) 3) ; no step-form
+         (mvdo-rebind-gen (cdr rebinds))) ; skip this parm
+        (t (cons (list (if (atom (caar rebinds))
+                           'setq
+                           'multiple-value-setq)
+                       (caar rebinds) ; var/s
+                       (third (car rebinds))) ; step-form
+                 (mvdo-rebind-gen (cdr rebinds))))))
+
+;; recurse through bindings, execute body, call rebind-gen
+(defun mvdo-gen (binds rebinds test body)
+  (if (null binds)
+      ;; fininshed all bindings
+      (let ((label (gensym))) ; block name
+        `(prog nil ; create block
+            ,label ; tag code
+            (if ,(car test) ; end-test
+                (return (progn ,@(cdr test)))) ; return w/ value
+            ,@body ; execute body
+            ;; why is this req'd if null initial bindings?
+            ,@(mvdo-rebind-gen rebinds) ; rebind parms
+            (go ,label))) ; loop (goto label)
+      ;; bind parms recursively (nested let/mvb), eval rec-form (above)
+      (let ((rec (mvdo-gen (cdr binds) rebinds test body)))
+        (let ((var/s (caar binds)) (expr (cadar binds)))
+          (if (atom var/s)
+              `(let ((,var/s ,expr)) ,rec)
+              `(multiple-value-bind ,var/s ,expr ,rec))))))
+
+(defmacro mvdo* (parm-cl test-cl &body body)
+  (mvdo-gen parm-cl parm-cl test-cl body))
+list*
+
+(defun shuffle (x y)
+  (cond ((null y) x)
+        ((null x) y)
+        (t (list* (car x) (car y)
+                  (shuffle (cdr x) (cdr y))))))
+
+(defmacro mvpsetq (&rest args)
+  )
