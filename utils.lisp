@@ -62,10 +62,10 @@
                    ((consp (car tree))
                     (rec (cdr tree)
                          (cons (rec (car tree) nil) acc))) ; recursive here
-                   ('t (rec (cdr tree)
-                            (if (funcall fn (car tree))
-                                acc
-                                (cons (car tree) acc)))))))
+                   (t (rec (cdr tree)
+                           (if (funcall fn (car tree))
+                               acc
+                               (cons (car tree) acc)))))))
     (rec lst nil)))
 
 ;;; search
@@ -214,8 +214,8 @@
 (defun memoize (fn)
   (let ((cache (make-hash-table :test #'equal)))
     #'(lambda (&rest args)
-        (multiple-value-bind (val win) (gethash args cache)
-          (if win
+        (multiple-value-bind (val contained) (gethash args cache)
+          (if contained
               val
               (setf (gethash args cache)
                     (apply fn args)))))))
